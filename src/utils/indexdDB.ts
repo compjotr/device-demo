@@ -1,78 +1,92 @@
 import { openDB } from "idb";
 import { DeviceStatus } from "../constants/device";
 
+// Database configuration constants
 const DB_NAME = "Device Database";
 const STORE_NAME = "DeviceStore";
-const DB_VERSION = 2;
+const DB_VERSION = 5; // Increment this when making structural changes to the database
 
-// Add interface for Device type
-interface Device {
+type Device = {
   serialNumber: string;
   name: string;
   status: string;
   lastConnectionDate: Date;
-}
+};
 
+/**
+ * Initializes the IndexedDB database with a fresh set of demo data.
+ * This function will:
+ * 1. Delete any existing database
+ * 2. Create a new database with the specified schema
+ * 3. Populate it with 200 demo devices
+ *
+ * @returns Promise<void>
+ * @throws Error if database initialization fails
+ */
 export const initDB = async (): Promise<void> => {
+  let db;
   try {
     console.log("Starting database initialization...");
-    const db = await openDB(DB_NAME, DB_VERSION, {
+
+    // Delete existing database
+    await new Promise<void>((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+      deleteRequest.onsuccess = () => {
+        console.log("Existing database deleted successfully");
+        resolve();
+      };
+      deleteRequest.onerror = () => reject(deleteRequest.error);
+    });
+
+    // Create new database with schema only
+    db = await openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
-        console.log("Database upgrade started");
-
-        // Add error handling for store creation
-        try {
-          if (db.objectStoreNames.contains(STORE_NAME)) {
-            db.deleteObjectStore(STORE_NAME);
-          }
-          const store = db.createObjectStore(STORE_NAME, {
-            keyPath: "serialNumber",
-          });
-
-          store.createIndex("name", "name", { unique: false });
-          store.createIndex("status", "status", { unique: false });
-          store.createIndex("lastConnectionDate", "lastConnectionDate", {
-            unique: false,
-          });
-          console.log("Store and indexes created successfully");
-        } catch (upgradeError) {
-          console.error("Error during store creation:", upgradeError);
-          throw upgradeError;
-        }
+        const store = db.createObjectStore(STORE_NAME, {
+          keyPath: "serialNumber",
+        });
+        // Create indexes
+        store.createIndex("name", "name", { unique: false });
+        store.createIndex("status", "status", { unique: false });
+        store.createIndex("lastConnectionDate", "lastConnectionDate", {
+          unique: false,
+        });
       },
     });
 
-    // Check if store exists before proceeding
-    if (!db.objectStoreNames.contains(STORE_NAME)) {
-      throw new Error("Store was not created successfully");
+    // Add devices using addDevice function
+    const oneDay = 24 * 60 * 60 * 1000; // milliseconds in a day
+    for (let i = 1; i <= 200; i++) {
+      const isActive = i % 3 === 0;
+      const paddedNumber = i.toString().padStart(3, "0");
+
+      // Calculate a date between 1 and 90 days ago
+      const daysAgo = Math.floor(Math.random() * 90) + 1;
+      const date = new Date(Date.now() - daysAgo * oneDay);
+
+      await addDevice({
+        serialNumber: `DEMO-${paddedNumber}`,
+        name: `Demo Device ${paddedNumber}`,
+        status: isActive ? "Active" : "Inactive",
+        lastConnectionDate: date,
+      });
     }
 
-    // First transaction: Add devices
-    const tx1 = db.transaction(STORE_NAME, "readwrite");
-    const store1 = tx1.objectStore(STORE_NAME);
-
-    // Initialize with 200 devices
-    const devices: Device[] = Array.from({ length: 200 }, (_, i) => ({
-      serialNumber: `SN${i.toString().padStart(5, "0")}`,
-      name: `Device ${i + 1}`,
-      status: i % 2 === 0 ? "Active" : "Inactive",
-      lastConnectionDate: new Date(),
-    }));
-
-    // Add all devices
-    await Promise.all(devices.map((device) => store1.add(device)));
-    await tx1.done;
-
-    // Second transaction: Verify count
-    const tx2 = db.transaction(STORE_NAME, "readonly");
-    const store2 = tx2.objectStore(STORE_NAME);
-    const count = await store2.count();
-    console.log(`Database initialized with ${count} devices`);
+    console.log("Database initialized successfully with 200 devices");
+    return;
   } catch (error) {
-    console.error("Failed to initialize database:", error);
+    console.error("Database initialization failed:", error);
     throw error;
+  } finally {
+    if (db) db.close();
   }
 };
+
+/**
+ * Adds a new device to the database
+ *
+ * @param device - Device object containing device details
+ * @returns Promise<boolean> - true if successful, false if failed
+ */
 
 export const addDevice = async (device: Device): Promise<boolean> => {
   try {
@@ -84,10 +98,11 @@ export const addDevice = async (device: Device): Promise<boolean> => {
       serialNumber: device.serialNumber,
       name: device.name,
       status: device.status,
-      lastConnectionDate: new Date(),
+      lastConnectionDate: device.lastConnectionDate,
     });
 
     await tx.done;
+    db.close();
     return true;
   } catch (error) {
     console.error("Error adding device:", error);
@@ -95,44 +110,75 @@ export const addDevice = async (device: Device): Promise<boolean> => {
   }
 };
 
-export const checkDeviceCount = async () => {
+/**
+ * Checks the total number of devices in the database
+ *
+ * @returns Promise<number> - The total count of devices, or 0 if database doesn't exist
+ */
+export const checkDeviceCount = async (): Promise<number> => {
+  let db;
   try {
-    const db = await openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // If store doesn't exist, create it
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, {
-            keyPath: "serialNumber",
-          });
+    // First check if the database exists
+    const databases = await indexedDB.databases();
+    const dbExists = databases.some((db) => db.name === DB_NAME);
 
-          // Create indexes
-          store.createIndex("name", "name", { unique: false });
-          store.createIndex("status", "status", { unique: false });
-          store.createIndex("lastConnectionDate", "lastConnectionDate", {
-            unique: false,
-          });
-        }
-      },
-    });
+    if (!dbExists) {
+      console.log("Database doesn't exist yet");
+      return 0;
+    }
+
+    db = await openDB(DB_NAME);
+
+    // Check if store exists
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      console.log("Store doesn't exist yet");
+      return 0;
+    }
 
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const count = await store.count();
+
     return count;
   } catch (error) {
     console.error("Error checking device count:", error);
     return 0;
+  } finally {
+    if (db) await db.close();
   }
 };
 
+/**
+ * Gets the count of active and inactive devices
+ *
+ * @returns Promise<{active: number, inactive: number}> - Object containing counts for each status
+ */
 export const getDeviceCounts = async () => {
   try {
+    // First check if the database exists
+    const databases = await indexedDB.databases();
+    const dbExists = databases.some((db) => db.name === DB_NAME);
+
+    if (!dbExists) {
+      console.log("Database doesn't exist yet");
+      return { active: 0, inactive: 0 };
+    }
+
     const db = await openDB(DB_NAME, DB_VERSION);
+
+    // Check if store exists
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      console.log("Store doesn't exist yet");
+      return { active: 0, inactive: 0 };
+    }
+
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const activeCount = (await store.index("status").getAll("Active")).length;
     const inactiveCount = (await store.index("status").getAll("Inactive"))
       .length;
+
+    await db.close();
     return { active: activeCount, inactive: inactiveCount };
   } catch (error) {
     console.warn("Database not initialized yet:", error);
@@ -140,6 +186,13 @@ export const getDeviceCounts = async () => {
   }
 };
 
+/**
+ * Retrieves devices based on their status
+ *
+ * @param statusFilter - Filter criteria (ALL, Active, or Inactive)
+ * @returns Promise<Device[]> - Array of devices matching the filter
+ * @throws Error if fetching fails
+ */
 export const getDevices = async (statusFilter: DeviceStatus) => {
   try {
     console.log("Fetching devices with filter:", statusFilter);
@@ -163,6 +216,13 @@ export const getDevices = async (statusFilter: DeviceStatus) => {
   }
 };
 
+/**
+ * Updates an existing device's information
+ *
+ * @param id - Serial number of the device to update
+ * @param updatedDevice - New device data
+ * @throws Error if update fails
+ */
 export const updateDevice = async (id: string, updatedDevice: Device) => {
   const db = await openDB(DB_NAME, DB_VERSION);
   const tx = db.transaction(STORE_NAME, "readwrite");
@@ -171,6 +231,12 @@ export const updateDevice = async (id: string, updatedDevice: Device) => {
   await tx.done;
 };
 
+/**
+ * Deletes a specific device from the database
+ *
+ * @param id - Serial number of the device to delete
+ * @throws Error if deletion fails
+ */
 export const deleteDevice = async (id: string) => {
   const db = await openDB(DB_NAME, DB_VERSION);
   const tx = db.transaction(STORE_NAME, "readwrite");
@@ -179,6 +245,12 @@ export const deleteDevice = async (id: string) => {
   await tx.done;
 };
 
+/**
+ * Deletes all IndexedDB databases in the current origin
+ * Useful for resetting the application state
+ *
+ * @throws Error if deletion fails
+ */
 export const deleteAllDatabases = async () => {
   const databases = await indexedDB.databases();
   await Promise.all(

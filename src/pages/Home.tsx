@@ -29,32 +29,32 @@ const HomePage = () => {
         setIsInitialized(false);
       }
     };
+    let mounted = true;
     fetchCount();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleInitialize = async () => {
     setIsLoading(true);
+    setError(null);
     setProgress("Starting database initialization...");
     try {
-      setProgress("Creating database structure...");
       await initDB();
-
-      setProgress("Verifying database...");
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      setProgress("Counting devices...");
       const newCount = await checkDeviceCount();
+      console.log("Device count after initialization:", newCount);
       setDeviceCount(newCount);
       setIsInitialized(true);
-
       toast.success("Database initialized successfully!");
-      setProgress("");
     } catch (error) {
+      console.error("Initialization failed:", error);
       setError(error as ErrorType);
+      setIsInitialized(false);
       toast.error("Failed to initialize database.");
-      console.error(error);
     } finally {
       setIsLoading(false);
+      setProgress("");
     }
   };
 
