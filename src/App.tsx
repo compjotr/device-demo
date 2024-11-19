@@ -2,8 +2,9 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import NavBar from "./components/NavBarComponent";
-import HomePage from "./pages/HomePageComponent";
-import DevicesPage from "./pages/DevicePageComponent";
+import HomePage from "./pages/Home";
+import DevicesPage from "./pages/Device";
+import { ROUTES } from "./constants/routes";
 
 function App() {
   return (
@@ -13,8 +14,8 @@ function App() {
 
         <main className="container mx-auto px-4">
           <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/devices" element={<DevicesPage />} />
+            <Route path={ROUTES.HOME} element={<HomePage />} />
+            <Route path={ROUTES.DEVICES} element={<DevicesPage />} />
           </Routes>
         </main>
         <ToastContainer position="bottom-right" />

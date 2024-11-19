@@ -1,18 +1,16 @@
-import React from "react";
-
-interface PaginationProps {
+type PaginationProps = {
   totalItems: number;
   itemsPerPage: number;
   currentPage: number;
   onPageChange: (page: number) => void;
-}
+};
 
-const Pagination: React.FC<PaginationProps> = ({
+const Pagination = ({
   totalItems,
   itemsPerPage,
   currentPage,
   onPageChange,
-}) => {
+}: PaginationProps) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const handlePageChange = (page: number) => {
@@ -28,8 +26,12 @@ const Pagination: React.FC<PaginationProps> = ({
         <button
           key={i}
           onClick={() => handlePageChange(i)}
-          className={`px-3 py-1 mx-1 border rounded ${
-            i === currentPage ? "bg-blue-500 text-white" : "bg-gray-200"
+          disabled={i === currentPage}
+          aria-label={`Page ${i}`}
+          className={`min-w-[40px] h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+            i === currentPage
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-700 hover:bg-gray-100"
           }`}
         >
           {i}
@@ -40,27 +42,49 @@ const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center mt-4">
+    <div className="flex justify-center items-center space-x-2 my-8">
       <button
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className={`px-3 py-1 mx-1 border rounded ${
-          currentPage === 1 ? "bg-gray-300 cursor-not-allowed" : "bg-gray-200"
-        }`}
+        aria-label="Previous page"
+        className="h-10 px-4 flex items-center text-sm font-medium text-gray-700 transition-colors rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
       >
-        Previous
+        <svg
+          className="w-4 h-4 mr-1"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        Prev
       </button>
       {renderPageNumbers()}
       <button
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className={`px-3 py-1 mx-1 border rounded ${
-          currentPage === totalPages
-            ? "bg-gray-300 cursor-not-allowed"
-            : "bg-gray-200"
-        }`}
+        aria-label="Next page"
+        className="h-10 px-4 flex items-center text-sm font-medium text-gray-700 transition-colors rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
       >
         Next
+        <svg
+          className="w-4 h-4 ml-1"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
       </button>
     </div>
   );

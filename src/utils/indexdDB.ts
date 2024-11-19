@@ -1,6 +1,5 @@
 import { openDB } from "idb";
-import { DeviceStatusValue } from "../constants/device";
-import { DEVICE_STATUS } from "../constants/device";
+import { DeviceStatus } from "../constants/device";
 
 const DB_NAME = "Device Database";
 const STORE_NAME = "DeviceStore";
@@ -16,28 +15,37 @@ interface Device {
 
 export const initDB = async (): Promise<void> => {
   try {
+    console.log("Starting database initialization...");
     const db = await openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         console.log("Database upgrade started");
 
-        // If store exists, delete it for fresh start
-        if (db.objectStoreNames.contains(STORE_NAME)) {
-          db.deleteObjectStore(STORE_NAME);
+        // Add error handling for store creation
+        try {
+          if (db.objectStoreNames.contains(STORE_NAME)) {
+            db.deleteObjectStore(STORE_NAME);
+          }
+          const store = db.createObjectStore(STORE_NAME, {
+            keyPath: "serialNumber",
+          });
+
+          store.createIndex("name", "name", { unique: false });
+          store.createIndex("status", "status", { unique: false });
+          store.createIndex("lastConnectionDate", "lastConnectionDate", {
+            unique: false,
+          });
+          console.log("Store and indexes created successfully");
+        } catch (upgradeError) {
+          console.error("Error during store creation:", upgradeError);
+          throw upgradeError;
         }
-
-        // Create new store
-        const store = db.createObjectStore(STORE_NAME, {
-          keyPath: "serialNumber",
-        });
-
-        // Create indexes
-        store.createIndex("name", "name", { unique: false });
-        store.createIndex("status", "status", { unique: false });
-        store.createIndex("lastConnectionDate", "lastConnectionDate", {
-          unique: false,
-        });
       },
     });
+
+    // Check if store exists before proceeding
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      throw new Error("Store was not created successfully");
+    }
 
     // First transaction: Add devices
     const tx1 = db.transaction(STORE_NAME, "readwrite");
@@ -132,15 +140,27 @@ export const getDeviceCounts = async () => {
   }
 };
 
-export const getDevices = async (statusFilter: DeviceStatusValue) => {
-  const db = await openDB(DB_NAME, DB_VERSION);
-  const tx = db.transaction(STORE_NAME, "readonly");
-  const store = tx.objectStore(STORE_NAME);
+export const getDevices = async (statusFilter: DeviceStatus) => {
+  try {
+    console.log("Fetching devices with filter:", statusFilter);
+    const db = await openDB(DB_NAME, DB_VERSION);
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
 
-  if (statusFilter === DEVICE_STATUS.ALL) return store.getAll();
+    let results;
+    if (statusFilter === DeviceStatus.ALL) {
+      results = await store.getAll();
+    } else {
+      const index = store.index("status");
+      results = await index.getAll(statusFilter);
+    }
 
-  const index = store.index("status");
-  return index.getAll(statusFilter);
+    console.log(`Found ${results.length} devices`);
+    return results;
+  } catch (error) {
+    console.error("Error fetching devices:", error);
+    throw error;
+  }
 };
 
 export const updateDevice = async (id: string, updatedDevice: Device) => {

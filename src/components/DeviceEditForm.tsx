@@ -1,21 +1,45 @@
 import React from "react";
 import { Device } from "../types/deviceInterface";
+import ButtonComponent from "./Button";
+import { toast } from "react-toastify";
 
 interface DeviceEditFormProps {
   device: Device;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   onCancel: () => void;
   onChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => void;
 }
 
-export const DeviceEditForm: React.FC<DeviceEditFormProps> = ({
+export const DeviceEditForm = ({
   device,
   onSave,
   onCancel,
   onChange,
-}) => {
+}: DeviceEditFormProps) => {
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const success = await onSave();
+      console.log("Save result:", success);
+
+      if (success === true) {
+        toast.success("Device updated successfully");
+      } else {
+        toast.error("Failed to update device");
+        console.warn("onSave returned:", success);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error("An error occurred while saving");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 max-w-sm border border-gray-100 hover:shadow-lg transition-shadow">
       <div className="mb-4">
@@ -31,7 +55,7 @@ export const DeviceEditForm: React.FC<DeviceEditFormProps> = ({
         />
       </div>
 
-      <div className="space-y-3 text-[#A3A3A3]">
+      <div className="space-y-3 text-gray-600">
         <p className="flex items-center">
           <span className="font-medium mr-2">Serial Number:</span>
           <span>{device.serialNumber}</span>
@@ -46,7 +70,7 @@ export const DeviceEditForm: React.FC<DeviceEditFormProps> = ({
             name="status"
             value={device.status}
             onChange={onChange}
-            className="px-2 py-1 rounded-full bg-[#89CFF0] text-white text-sm border-none focus:ring-2 focus:ring-[#004E82]"
+            className="px-4 py-2 rounded-full text-white text-sm border-none focus:ring-2 focus:ring-[#004E82]"
             aria-label="Device status"
             data-testid="device-status-select"
           >
@@ -57,21 +81,22 @@ export const DeviceEditForm: React.FC<DeviceEditFormProps> = ({
       </div>
 
       <div className="mt-6 flex space-x-3">
-        <button
-          onClick={onSave}
-          className="bg-[#004E82] text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors flex-1"
-          disabled={!device.name.trim()}
+        <ButtonComponent
+          onClick={handleSave}
+          variant="primary"
+          disabled={!device.name.trim() || isSaving}
           data-testid="save-button"
         >
-          Save
-        </button>
-        <button
+          {isSaving ? "Saving..." : "Save"}
+        </ButtonComponent>
+        <ButtonComponent
           onClick={onCancel}
-          className="bg-[#4E8200] text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors flex-1"
+          variant="primary"
+          disabled={isSaving}
           data-testid="cancel-button"
         >
           Cancel
-        </button>
+        </ButtonComponent>
       </div>
     </div>
   );

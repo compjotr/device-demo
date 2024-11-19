@@ -3,11 +3,11 @@ import { Device } from "../types/deviceInterface";
 import { DeviceEditForm } from "./DeviceEditForm";
 import { DeviceDisplay } from "./DeviceDisplay";
 
-interface DeviceItemProps {
+type DeviceItemProps = {
   device: Device;
   onUpdate: (id: string, updatedDevice: Device) => void;
   onDelete: (id: string) => void;
-}
+};
 
 type EditState = {
   isEditing: boolean;
@@ -24,19 +24,23 @@ const DeviceItem: React.FC<DeviceItemProps> = ({
     device: device,
   });
 
+  // The edit state is stored in case the suer presses cancel on accident.
   const handleEditToggle = () => {
     setEditState((prev) => ({
       isEditing: !prev.isEditing,
-      device: !prev.isEditing ? device : prev.device,
+      device: prev.device,
     }));
   };
 
-  const handleSave = () => {
-    if (!editState.device.name.trim()) {
-      return;
+  const handleSave = async () => {
+    try {
+      onUpdate(device.serialNumber, editState.device);
+      setEditState((prev) => ({ ...prev, isEditing: false }));
+      return true;
+    } catch (error) {
+      console.error("Failed to update device:", error);
+      return false;
     }
-    onUpdate(device.serialNumber, editState.device);
-    setEditState((prev) => ({ ...prev, isEditing: false }));
   };
 
   const handleInputChange = (
