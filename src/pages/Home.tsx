@@ -29,11 +29,7 @@ const HomePage = () => {
         setIsInitialized(false);
       }
     };
-    let mounted = true;
     fetchCount();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const handleInitialize = async () => {
