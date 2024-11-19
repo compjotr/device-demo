@@ -135,7 +135,7 @@ export const getDeviceCounts = async () => {
       .length;
     return { active: activeCount, inactive: inactiveCount };
   } catch (error) {
-    console.warn("Database not initialized yet");
+    console.warn("Database not initialized yet:", error);
     return { active: 0, inactive: 0 };
   }
 };

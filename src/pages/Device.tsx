@@ -16,7 +16,7 @@ const DevicesPage = () => {
   const itemsPerPage = 12;
 
   const { currentPage, setCurrentPage, paginatedItems } =
-    usePagination(itemsPerPage);
+    usePagination<Device>(itemsPerPage);
 
   useEffect(() => {
     const fetchDevices = async () => {
